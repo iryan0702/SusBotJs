@@ -10,6 +10,8 @@ const intents = new Intents();
 intents.add(Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES);
 const client = new Client({ intents });
 const db = new Database();
+// mongoDB connection string
+const databaseLink = "mongodb+srv://iryan0702:<password>@susbotjs.6rrp1.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
 
 const prefix = "sus";
 const matchGameItems = ["salad","taco","sandwich","pizza","fries","hamburger","hotdog","bacon","waffle","pancakes","cheese","bread","carrot","eggplant","avocado","broccoli","corn","tomato","strawberry","peach","pineapple","lemon","tangerine","apple","pear"];
@@ -42,14 +44,17 @@ var User = function (id) {
 };
 
 function setUndefinedUserVariables(user){
-  if(user.version === undefined || user.version != 1){
+  if(user.version === undefined || user.version != 3){
     console.log(`user version was ${user.version}! updating!`)
-    user.version = 1;
+    user.version = 3;
     if(user.credits === undefined){
       user.credits = 0;
     }
     if(user.lastWorkTime === undefined){
       user.lastWorkTime = 0;
+    }
+    if(user.workCollectionPower === undefined){
+      user.workCollectionPower = 1;
     }
   }
 }
@@ -114,7 +119,7 @@ client.on('messageCreate', message => {
     /// SCOPE TO ACCESS AND MODIFY "USERS" DATA
     ///////////////////////////////////////
     db.get("users").then(users => {
-      const args = message.content.slice(prefix.length).trim().split(/ +/);
+      const args = content.slice(prefix.length).trim().split(/ +/);
       const command = args.shift().toLowerCase();
 
       if (message.author.id in users) {
@@ -250,7 +255,7 @@ client.on('messageCreate', message => {
         }
 
 
-        if (message.content.startsWith(prefix)){
+        if (content.startsWith(prefix)){
           if(command == 'check'){
             if(user.sus){
                 message.channel.send("You are sussy!");
@@ -304,28 +309,72 @@ client.on('messageCreate', message => {
           }
 
           else if(command == 'work'){
-            var lastWork = (message.createdTimestamp - user.lastWorkTime)/1000;
-            if(lastWork >= 60){
-              user.lastWorkTime = message.createdTimestamp;
-              var creditGain = Math.floor(Math.random() * 3 + 1);
-              user.credits += creditGain;
-              switch(Math.floor(Math.random() * 4)){
-                case 3:
-                  message.channel.send(`You took out some garbage and found ${creditGain} ship credits!`);
-                  break;
-                case 2:
-                  message.channel.send(`You rewired some panels and earned ${creditGain} ship credits!`);
-                  break;
-                case 1:
-                  message.channel.send(`You shot some asteroids and collected ${creditGain} ship credits!`);
-                  break;
-                case 0:
-                default:
-                  message.channel.send(`You tinkered with the engine and earned ${creditGain} ship credits!`);
-              }
-              message.channel.send(`You now have ${user.credits} credits!`);
+            if(args[0] == "hard"){
+              message.channel.send(`more like ur mum works hard lmao`);
             }else{
-              message.channel.send(`There is nothing to do! Please wait ${parseInt(60 - lastWork)} seconds!`);
+              var lastWork = (message.createdTimestamp - user.lastWorkTime)/1000;
+              if(lastWork >= 60){
+                var workMessage = "";
+                user.lastWorkTime = message.createdTimestamp;
+                var collectionPowerMultiplier = Math.min(Math.floor(lastWork/60), user.workCollectionPower);
+                if(collectionPowerMultiplier > 1){
+                  workMessage += `You performed ${collectionPowerMultiplier} minutes worth of work!`;
+                }
+                var creditGain = 0;
+                for(let i = 0; i < collectionPowerMultiplier; i++){
+                  creditGain += Math.floor(Math.random() * 3 + 1);
+                }
+                user.credits += creditGain;
+                switch(Math.floor(Math.random() * 4)){
+                  case 3:
+                    workMessage += `\nYou took out some garbage and found ${creditGain} ship credits!`;
+                    break;
+                  case 2:
+                    workMessage += `\nYou rewired some panels and earned ${creditGain} ship credits!`;
+                    break;
+                  case 1:
+                    workMessage += `\nYou shot some asteroids and collected ${creditGain} ship credits!`;
+                    break;
+                  case 0:
+                  default:
+                    workMessage += `\nYou tinkered with the engine and earned ${creditGain} ship credits!`;
+                }
+                workMessage += `\nYou now have ${user.credits} credits!`;
+                message.channel.send(workMessage);
+              }else{
+              message.channel.send(`There is nothing to do! Please wait ${parseInt(60 - lastWork, 10)} seconds!`);
+              }
+            }
+          }
+
+          else if(command == 'upgrades'){
+            var workCollectionPowerPrice = parseInt(Math.pow(user.workCollectionPower,1.6),10);
+            var helpEmbed = new MessageEmbed()
+              .setColor('#bb0000')
+              .setTitle('Upgrades')
+              .setAuthor('Sus upgrades', 'https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
+              .setDescription('list of upgrades:')
+              .setThumbnail('https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
+              .addFields(
+                { name: `Work collection power lv ${user.workCollectionPower+1}: ${workCollectionPowerPrice} Creds`, value: `Increase your work collection power: whenever you work, get up to **${user.workCollectionPower+1}** minutes worth of work credits from the time since you last worked! \nid: \`WCPower\`` }
+              )
+              .setFooter('purchase with "sus buy". progress may be reset at any moment lol');
+
+            message.channel.send({ embeds: [helpEmbed] });
+          }
+
+          else if(command == 'buy'){
+            var workCollectionPowerPrice = parseInt(Math.pow(user.workCollectionPower,1.6),10);
+            if(args[0] == "wcpower"){
+              if(user.credits >= workCollectionPowerPrice){
+                user.credits -= workCollectionPowerPrice;
+                user.workCollectionPower++;
+                message.channel.send(`Purchased work collection power +1!`);
+              }else{
+                message.channel.send(`You do not have enough credits!`);
+              }
+            }else{
+                message.channel.send("What do you want to buy? Check out `sus upgrades` for options!");
             }
           }
 
@@ -627,6 +676,8 @@ client.on('messageCreate', message => {
                       { name: 'sus ping', value: 'check if ping is sussy' },
                       { name: 'sus gaming', value: 'choose from over 1!!! non-sus games!' },
                       { name: 'sus work', value: 'earn some credits! (1 min cooldown)' },
+                      { name: 'sus give', value: 'give some credits!' },
+                      { name: 'sus upgrades', value: 'spend your hard earned credits!' },
                       { name: 'sus workout', value: 'generate a sussy workout routine' },
                       { name: 'sus', value: 'SUS' },
                       { name: 'sus help', value: 'this tbh' }
@@ -657,6 +708,7 @@ client.on('messageCreate', message => {
                 db.set("matchLeaderboard", {})
                 message.channel.send("Cleared leaderboard!");
             }else if(content == 'sussy sussy clear the user database'){
+                // This actually doesn't work since the end of the function restores the users database. Fix when data clearing is necessary, no need to reset now.
                 db.set("users", {})
                 message.channel.send("Cleared user data!");
             }
