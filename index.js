@@ -13,6 +13,9 @@ intents.add(Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES);
 const client = new Client({ intents });
 const db = new Database();
 
+const mobDictionary = require("./mobDictionary");
+const planetGenerator = require("./planetGenerator");
+
 // mongoDB connection string
 const databaseLink = "mongodb+srv://iryan0702:tempInsecurePassword@susbotjs.6rrp1.mongodb.net/SusBotJs?retryWrites=true&w=majority";
 var databaseLoaded = false;
@@ -23,7 +26,7 @@ mongoose.connect(databaseLink)
   })
   .catch((error) => console.log(`error: ${error}`));
 
-const prefix = "sus";
+const prefix = "sus ";
 
 // constant
 const matchGameItems = ["salad","taco","sandwich","pizza","fries","hamburger","hotdog","bacon","waffle","pancakes","cheese","bread","carrot","eggplant","avocado","broccoli","corn","tomato","strawberry","peach","pineapple","lemon","tangerine","apple","pear"];
@@ -104,6 +107,7 @@ db.get("fitLeaderboardHard").then(fitLeaderboardHard => {
 
 client.on('ready', () => {
     console.log(`${client.user.tag} has logged in!`);
+    mobDictionary.load(client);
 
     client.user.setActivity('check commands with Sus help!', { type: 'PLAYING' })
 });
@@ -134,27 +138,30 @@ client.on('messageCreate', async message => {
 
   //get all stored user properties of message sender (or create a new user object if none exist) from database
   const user = await getUser(message.author.id);
+  user.lastUsername = message.author.username;
 
   //if the user has a special listenMode , respond accordingly to the message
   //if appropriate, return and do not process the message as a normal command
-  console.log("listenModeResponses");
   var listenContinue = await listenModeResponses(user, message);
-  console.log(listenContinue);
   if(listenContinue){
     user.save();
     return;
   }
 
-  console.log("sad");
+  // simple reply (used to check if bot is up)
+  if(content == "sus"){
+    message.channel.send("SUS");
+    return;
+  }
+
   // responses that do not trigger on command prefix:
   if(content.includes("sad")){
     message.channel.send("Cheer up! Being sad is hella sussy!");
   }
 
-  console.log("prefix");
   if (content.startsWith(prefix)){
-    console.log(`command ${command}`);
-    console.log(`args ${args}`);
+    // console.log(`command ${command}`);
+    // console.log(`args ${args}`);
     if(command == 'check'){
       if(user.sus){
           message.channel.send("You are sussy!");
@@ -205,6 +212,60 @@ client.on('messageCreate', async message => {
     else if(command == 'listen'){
       user.listenMode = 'reply';
       message.channel.send(`Listening to <@${message.author.id}>`);
+    }
+    
+    else if(command == 'scan'){
+      var scanCooldown = 60 * 60;
+      var lastScan = (message.createdTimestamp - user.lastScanTime)/1000;
+      if(lastScan > scanCooldown){
+        user.lastScanTime = message.createdTimestamp;
+        user.scannedPlanets = [];
+        user.scannedPlanets.push(planetGenerator.generatePlanet(0,0));
+
+        var planet = user.scannedPlanets[0];
+        var floraEmoteString = "";
+        for(let i = 0; i < planet.flora.length; i++){
+          if(i != 0){
+            floraEmoteString += "\n";
+          }
+          let floraItem = mobDictionary.getEmoji(planet.flora[i]).toString();
+          floraEmoteString += `${floraItem} ${planet.flora[i]}\n\\> Drops: `;
+          let floraDrops = mobDictionary.getDrops(planet.flora[i]);
+          for(let j = 0; j < floraDrops.length; j++){
+            let floraDropItem = mobDictionary.getEmoji(floraDrops[j]).toString();
+            floraEmoteString += floraDropItem;
+          }
+        }
+        var faunaEmoteString = "";
+        for(let i = 0; i < planet.fauna.length; i++){
+          if(i != 0){
+            faunaEmoteString += "\n";
+          }
+          let faunaItem = mobDictionary.getEmoji(planet.fauna[i]).toString();
+          faunaEmoteString += `${faunaItem} ${planet.fauna[i]}\n\\> Drops: `;
+          let faunaDrops = mobDictionary.getDrops(planet.fauna[i]);
+          for(let j = 0; j < faunaDrops.length; j++){
+            let faunaDropItem = mobDictionary.getEmoji(faunaDrops[j]).toString();
+            faunaEmoteString += faunaDropItem;
+          }
+        }
+        var planetEmbed = new MessageEmbed()
+        .setColor('#ff0000')
+        .setTitle(`${planet.name}`)
+        .setAuthor('Scanned Planet', 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+        .setDescription(`A ${planet.descriptor} Type-1 planet with basic resources.\n*Average Temperature:* **${planet.temperature}°C**\n*Atmospheric pressure:* **${planet.atmospheres} atm**`)
+        .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+        .addFields(
+          { name: `**Planet Flora:**`, value: `${floraEmoteString}` },
+          { name: `**Planet Fauna:**`, value: `${faunaEmoteString}` },
+          { name: `**Underground Resources:**`, value: `${mobDictionary.getEmoji("Stone").toString()}\n(Type-1 planets do not have precious metals.)` }
+        )
+        .setFooter('very bare bones rn, there will be more details');
+
+        message.channel.send({ embeds: [planetEmbed] });
+      }else{
+        message.channel.send(`Your scanner is cooling down! Please wait ${(Math.ceil((scanCooldown - lastScan)/60))} Minutes and ${Math.ceil((scanCooldown - lastScan)%60)} Seconds!\nUpgrade your scanner system to decrease this cooldown (not a feature yet).`);
+      }
     }
 
     else if(command == 'work'){
@@ -559,10 +620,6 @@ client.on('messageCreate', async message => {
         })
     }
 
-    else if(command == ''){
-        message.channel.send("SUS");
-    }
-
     else if(command == 'help'){
         var helpEmbed = new MessageEmbed()
             .setColor('#bb0000')
@@ -800,7 +857,5 @@ async function getUser(searchId){
 }
 
 client.login(token);
-
-
 
 keepAlive();
