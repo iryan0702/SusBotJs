@@ -3,10 +3,6 @@ var trigsEmote, meatberriesEmote, lognutsEmote, stonefruitsEmote, threadwoodEmot
 const tier1Fauna = ["Firrets", "Worves", "Kindlings", "String Snakes", "Rock Squids"];
 var firretsEmote, worvesEmote, kindlingsEmote, stringSnakesEmote, rockSquidsEmote;
 
-const tier1Enviornment = ["Island", "Desert", "Mountain"];
-const tier1Underground = ["Gravel"];
-
-
 const resources = ["Stone", "Cloth", "Wood", "Food"];
 var stoneEmote, clothEmote, woodEmote, foodEmote;
 

@@ -6,7 +6,7 @@ const userSchema = new Schema({
     type: String,
     required: true
   },
-  lastUsername: { // the username of the user since the last getUser(), should only be used for debugging
+  username: { // the username of the user since the last getUser()
     type: String
   },
   sus: {
@@ -64,6 +64,10 @@ const userSchema = new Schema({
   storedPlanets: {
     type: Array,
     default: []
+  }, 
+  currentLocation: {
+    type: String,
+    default: "nowhere"
   }
 }, {timestamps: true})
 

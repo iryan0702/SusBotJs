@@ -27,6 +27,7 @@ mongoose.connect(databaseLink)
   .catch((error) => console.log(`error: ${error}`));
 
 const prefix = "sus ";
+const devId = '95070190370299904';
 
 // constant
 const matchGameItems = ["salad","taco","sandwich","pizza","fries","hamburger","hotdog","bacon","waffle","pancakes","cheese","bread","carrot","eggplant","avocado","broccoli","corn","tomato","strawberry","peach","pineapple","lemon","tangerine","apple","pear"];
@@ -138,7 +139,7 @@ client.on('messageCreate', async message => {
 
   //get all stored user properties of message sender (or create a new user object if none exist) from database
   const user = await getUser(message.author.id);
-  user.lastUsername = message.author.username;
+  user.username = message.author.username;
 
   //if the user has a special listenMode , respond accordingly to the message
   //if appropriate, return and do not process the message as a normal command
@@ -148,17 +149,23 @@ client.on('messageCreate', async message => {
     return;
   }
 
+  //////
+  /// responses that do not trigger on command prefix:
+  //////
+
   // simple reply (used to check if bot is up)
   if(content == "sus"){
     message.channel.send("SUS");
     return;
   }
 
-  // responses that do not trigger on command prefix:
   if(content.includes("sad")){
     message.channel.send("Cheer up! Being sad is hella sussy!");
   }
 
+  //////
+  /// prefixed commands:
+  //////
   if (content.startsWith(prefix)){
     // console.log(`command ${command}`);
     // console.log(`args ${args}`);
@@ -214,57 +221,50 @@ client.on('messageCreate', async message => {
       message.channel.send(`Listening to <@${message.author.id}>`);
     }
     
-    else if(command == 'scan'){
-      var scanCooldown = 60 * 60;
-      var lastScan = (message.createdTimestamp - user.lastScanTime)/1000;
-      if(lastScan > scanCooldown){
-        user.lastScanTime = message.createdTimestamp;
-        user.scannedPlanets = [];
-        user.scannedPlanets.push(planetGenerator.generatePlanet(0,0));
+    else if(command == 'scanner'){
+      if(args[0] == 'scan'){
+        var scanCooldown = 60 * 60;
+        var lastScan = (message.createdTimestamp - user.lastScanTime)/1000;
+        if(lastScan > scanCooldown || user.id == devId){
+          user.lastScanTime = message.createdTimestamp;
+          user.scannedPlanets = [];
+          user.scannedPlanets.push(planetGenerator.generatePlanet(user));
+          user.scannedPlanets.push(planetGenerator.generatePlanet(user));
 
-        var planet = user.scannedPlanets[0];
-        var floraEmoteString = "";
-        for(let i = 0; i < planet.flora.length; i++){
-          if(i != 0){
-            floraEmoteString += "\n";
-          }
-          let floraItem = mobDictionary.getEmoji(planet.flora[i]).toString();
-          floraEmoteString += `${floraItem} ${planet.flora[i]}\n\\> Drops: `;
-          let floraDrops = mobDictionary.getDrops(planet.flora[i]);
-          for(let j = 0; j < floraDrops.length; j++){
-            let floraDropItem = mobDictionary.getEmoji(floraDrops[j]).toString();
-            floraEmoteString += floraDropItem;
-          }
+          displayPlanetsSummaryEmbed(user, "scanned", message.channel);
+          
+        }else{
+          message.channel.send(`Your scanner is cooling down! Please wait ${(Math.floor((scanCooldown - lastScan)/60))} Minutes and ${Math.ceil((scanCooldown - lastScan)%60)} Seconds!\nUpgrade your scanner system to decrease this cooldown (not a feature yet).`);
         }
-        var faunaEmoteString = "";
-        for(let i = 0; i < planet.fauna.length; i++){
-          if(i != 0){
-            faunaEmoteString += "\n";
-          }
-          let faunaItem = mobDictionary.getEmoji(planet.fauna[i]).toString();
-          faunaEmoteString += `${faunaItem} ${planet.fauna[i]}\n\\> Drops: `;
-          let faunaDrops = mobDictionary.getDrops(planet.fauna[i]);
-          for(let j = 0; j < faunaDrops.length; j++){
-            let faunaDropItem = mobDictionary.getEmoji(faunaDrops[j]).toString();
-            faunaEmoteString += faunaDropItem;
-          }
-        }
-        var planetEmbed = new MessageEmbed()
-        .setColor('#ff0000')
-        .setTitle(`${planet.name}`)
-        .setAuthor('Scanned Planet', 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-        .setDescription(`A ${planet.descriptor} Type-1 planet with basic resources.\n*Average Temperature:* **${planet.temperature}°C**\n*Atmospheric pressure:* **${planet.atmospheres} atm**`)
-        .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-        .addFields(
-          { name: `**Planet Flora:**`, value: `${floraEmoteString}` },
-          { name: `**Planet Fauna:**`, value: `${faunaEmoteString}` },
-          { name: `**Underground Resources:**`, value: `${mobDictionary.getEmoji("Stone").toString()}\n(Type-1 planets do not have precious metals.)` }
-        )
-        .setFooter('very bare bones rn, there will be more details');
-
-        message.channel.send({ embeds: [planetEmbed] });
       }else{
-        message.channel.send(`Your scanner is cooling down! Please wait ${(Math.ceil((scanCooldown - lastScan)/60))} Minutes and ${Math.ceil((scanCooldown - lastScan)%60)} Seconds!\nUpgrade your scanner system to decrease this cooldown (not a feature yet).`);
+        displayPlanetsSummaryEmbed(user, "scanned", message.channel);
+      }
+    }
+
+    else if(command == 'planets' || command == 'planet'){
+      if(args[0] == 'detail' || args[0] == 'details'){
+        if(args[1]){
+          for(let i = 0; i < user.scannedPlanets.length; i++){
+            if(args[1].toLowerCase() == user.scannedPlanets[i].name.toLowerCase()){
+              displayPlanetDetailEmbed(user.scannedPlanets[i], message.channel);
+              return;
+            }
+          }
+          for(let i = 0; i < user.storedPlanets.length; i++){
+            if(args[1].toLowerCase() == user.storedPlanets[i].name.toLowerCase()){
+              displayPlanetDetailEmbed(user.storedPlanets[i], message.channel);
+              return;
+            }
+          }
+        }else{
+          message.channel.send("Command: `planets detail [planet name]`");
+        }
+      }else{
+        var planetCommandInfo = new MessageEmbed()
+          .setColor('#bb0000')
+          .setTitle(":ringed_planet: Planet command:")
+          .setDescription('`planet details [name]`: get details about any scanned or stored planet\n~~planet add [name]~~: add a scanned planet to your stored planets list\n~~planet remove [name]~~: remove a planet from your stored planets list\n~~planet list~~: get a list of your stored planets')
+        message.channel.send({ embeds: [planetCommandInfo] });
       }
     }
 
@@ -621,29 +621,46 @@ client.on('messageCreate', async message => {
     }
 
     else if(command == 'help'){
-        var helpEmbed = new MessageEmbed()
-            .setColor('#bb0000')
-            .setTitle('Help')
-            .setAuthor('Sus help', 'https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
-            .setDescription('list of commands:')
-            .setThumbnail('https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
-            .addFields(
-                { name: 'sus check', value: 'check susness' },
-                { name: 'sus vent', value: 'detroit: become sus' },
-                { name: 'sus unvent', value: 'not sus' },
-                { name: 'sus listen', value: 'r-repeat next thing you say, you sussy baka' },
-                { name: 'sus ping', value: 'check if ping is sussy' },
-                { name: 'sus gaming', value: 'choose from over 1!!! non-sus games!' },
-                { name: 'sus work', value: 'earn some credits! (1 min cooldown)' },
-                { name: 'sus give', value: 'give some credits!' },
-                { name: 'sus upgrades', value: 'spend your hard earned credits!' },
-                { name: 'sus workout', value: 'generate a sussy workout routine' },
-                { name: 'sus', value: 'SUS' },
-                { name: 'sus help', value: 'this tbh' }
-            )
-            .setFooter('Footer? sus');
-
-        message.channel.send({ embeds: [helpEmbed] });
+      switch(args[0]){
+        case "2":
+          var helpEmbed = new MessageEmbed()
+          .setColor('#404040')
+          .setTitle('Misc commands (2/2)')
+          .setAuthor('Sus help', 'https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
+          .setDescription('list of commands:')
+          .setThumbnail('https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
+          .addFields(
+            { name: 'sus check', value: 'check susness' },
+            { name: 'sus vent', value: 'detroit: become sus' },
+            { name: 'sus unvent', value: 'not sus' },
+            { name: 'sus listen', value: 'r-repeat next thing you say, you sussy baka' },
+            { name: 'sus ping', value: 'check if ping is sussy' },
+            { name: 'sus gaming', value: 'choose from over 1!!! non-sus mini games!' },
+            { name: 'sus workout', value: 'generate a sussy workout routine' },
+            { name: 'sus', value: 'SUS' },
+            { name: 'sus help', value: 'this tbh' }
+          )
+          .setFooter('Use "help [page #]" to see more!');
+          message.channel.send({ embeds: [helpEmbed] });
+          break;
+        case "1":
+        default:
+          var helpEmbed = new MessageEmbed()
+          .setColor('#bb0000')
+          .setTitle('Game commands (1/2)')
+          .setAuthor('Sus help', 'https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
+          .setDescription('list of commands:')
+          .setThumbnail('https://ih1.redbubble.net/image.1707617979.4007/flat,128x,075,f-pad,128x128,f8f8f8.jpg')
+          .addFields(
+            { name: 'sus scanner', value: 'scan for new planets!' },
+            { name: 'sus planets', value: 'manage your planets!' },
+            { name: 'sus work', value: 'earn some credits! (1 min cooldown)' },
+            { name: 'sus upgrades', value: 'spend your hard earned credits!' },
+            { name: 'sus give', value: 'give some credits!' }
+          )
+          .setFooter('Use "help [page #]" to see more!');
+          message.channel.send({ embeds: [helpEmbed] });
+      }
     }
 
     else if(command == 'workout'){
@@ -794,6 +811,151 @@ async function listenModeResponses(user, message){
     return true;
   }
   return false;
+}
+
+function displayPlanetsSummaryEmbed(user, mode, channel){
+  if(mode == "scanned"){
+    var planetsList = user.scannedPlanets;
+
+    if(planetsList.length > 0){
+      var planetsEmbed = new MessageEmbed()
+      .setColor("#bb0000")
+      .setTitle(`Scanned Planets`)
+      .setAuthor(`${user.username}'s Scanned Planets`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+      .setDescription("A list of planets from your previous scan.\nSee a planet's details with `planets detail [name]`!")
+      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
+
+      for(let i = 0; i < planetsList.length; i++){
+        let planet = planetsList[i];
+        let dropsDescription = "";
+        let planetName = planet.name;
+
+        for(let j = 0; j < planet.flora.length; j++){
+          if(planet.floraDiscovery[j]){
+            dropsDescription += mobDictionary.getEmoji(planet.flora[j]).toString();
+          }else{
+            dropsDescription += "[?]";
+          }
+        }
+        for(let j = 0; j < planet.fauna.length; j++){
+          if(planet.faunaDiscovery[j]){
+            dropsDescription += mobDictionary.getEmoji(planet.fauna[j]).toString();
+          }else{
+            dropsDescription += "[?]";
+          }
+        }
+        if(planet.specials.length > 0){
+          dropsDescription += "\n";
+          for(let k = 0; k < planet.specials.length; k++){
+            if(k != 0){
+              dropsDescription += " ";
+            }
+            dropsDescription += " " + planetGenerator.getSpecialsDescription(planet.specials[k], true);
+          }
+        }
+        
+        specialsField = { name: `**${planetName}**`, value: `Known resources: ${dropsDescription}\n` };
+
+        planetsEmbed.addFields(specialsField);
+      }
+      planetsEmbed.setFooter('Scan for new planets with "scanner scan"');
+
+      channel.send({ embeds: [planetsEmbed] });
+    }else{
+      var planetsEmbed = new MessageEmbed()
+      .setColor("#bb0000")
+      .setTitle(`Scanned Planets`)
+      .setAuthor(`${user.username}'s Scanned Planets`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+      .setDescription("You haven't scanned any planets!\nUse `scanner scan` to start!")
+      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
+
+      channel.send({ embeds: [planetsEmbed] });
+    }
+  }
+}
+
+function displayPlanetDetailEmbed(planet, channel){
+  var floraEmoteString = "";
+  for(let i = 0; i < planet.flora.length; i++){
+    if(i != 0){
+      floraEmoteString += "\n";
+    }
+    if(planet.floraDiscovery[i]){
+      let floraItem = mobDictionary.getEmoji(planet.flora[i]).toString();
+      floraEmoteString += `${floraItem} ${planet.flora[i]}`
+    }else{
+      floraEmoteString += `**[?]**`
+    }
+    if(planet.floraRateDiscovery[i]){
+      floraEmoteString += ` – Quantity: ${planet.floraRate[i]}\n\\> Drops: `;
+    }else{
+      floraEmoteString += ` – Quantity: **[?]**\n\\> Drops: `;
+    }
+    if(planet.floraDiscovery[i]){
+      let floraDrops = mobDictionary.getDrops(planet.flora[i]);
+      for(let j = 0; j < floraDrops.length; j++){
+        let floraDropItem = mobDictionary.getEmoji(floraDrops[j]).toString();
+        floraEmoteString += floraDropItem;
+      }
+    }else{
+      floraEmoteString += `**[?]**`
+    }
+  }
+  var faunaEmoteString = "";
+  for(let i = 0; i < planet.fauna.length; i++){
+    if(i != 0){
+      faunaEmoteString += "\n";
+    }
+    if(planet.faunaDiscovery[i]){
+      let faunaItem = mobDictionary.getEmoji(planet.fauna[i]).toString();
+      faunaEmoteString += `${faunaItem} ${planet.fauna[i]}`
+    }else{
+      faunaEmoteString += `**[?]**`
+    }
+    if(planet.faunaRateDiscovery[i]){
+      faunaEmoteString += ` – Quantity: ${planet.faunaRate[i]}\n\\> Drops: `;
+    }else{
+      faunaEmoteString += ` – Quantity: **[?]**\n\\> Drops: `;
+    }
+    if(planet.faunaDiscovery[i]){
+      let faunaDrops = mobDictionary.getDrops(planet.fauna[i]);
+      for(let j = 0; j < faunaDrops.length; j++){
+        let faunaDropItem = mobDictionary.getEmoji(faunaDrops[j]).toString();
+        faunaEmoteString += faunaDropItem;
+      }
+    }else{
+      faunaEmoteString += `**[?]**`
+    }
+  }
+  var planetEmbed = new MessageEmbed()
+  .setColor(planet.embedColor)
+  .setTitle(`${planet.name}`)
+  .setAuthor('Scanned Planet', 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+  .setDescription(`A ${planet.descriptor} Type-1 planet with basic resources.\n*Average Temperature:* **${planet.temperature}°C**\n*Atmospheric pressure:* **${planet.atmospheres} atm**`)
+  .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+  .addFields(
+    { name: `**Planet Flora:**`, value: `${floraEmoteString}` },
+    { name: `**Planet Fauna:**`, value: `${faunaEmoteString}` },
+    { name: `**Underground Resources:**`, value: `${mobDictionary.getEmoji("Stone").toString()}\n(Type-1 planets do not contain precious metals.)` }
+  );
+
+  if(planet.specials.length > 0){
+    var specialsField;
+    specialsDescription = "";
+    for(let i = 0; i < planet.specials.length; i++){
+      if(i != 0){
+        specialsDescription += "\n";
+      }
+      specialsDescription += planetGenerator.getSpecialsDescription(planet.specials[i]);
+    }
+
+    specialsField = { name: `**Special Attributes:**`, value: `${specialsDescription} ` };
+    planetEmbed.addFields(specialsField);
+  }
+
+  planetEmbed.setFooter('Store a planet into your database with "planets add" (not yet)');
+
+  channel.send({ embeds: [planetEmbed] });
 }
 
 // getUserFromMention from https://discordjs.guide/miscellaneous/parsing-mention-arguments.html#implementation
