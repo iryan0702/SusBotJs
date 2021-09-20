@@ -236,8 +236,14 @@ client.on('messageCreate', async message => {
         }else{
           message.channel.send(`Your scanner is cooling down! Please wait ${(Math.floor((scanCooldown - lastScan)/60))} Minutes and ${Math.ceil((scanCooldown - lastScan)%60)} Seconds!\nUpgrade your scanner system to decrease this cooldown (not a feature yet).`);
         }
-      }else{
+      }else if(args[0] == 'list'){
         displayPlanetsSummaryEmbed(user, "scanned", message.channel);
+      }else{
+        var scannerCommandInfo = new MessageEmbed()
+          .setColor('#bb0000')
+          .setTitle(":satellite: Scannner command:")
+          .setDescription('`scanner scan`: scan for new planets!\n`scanner list`: get a list of planets from your last scan')
+        message.channel.send({ embeds: [scannerCommandInfo] });
       }
     }
 
@@ -329,6 +335,15 @@ client.on('messageCreate', async message => {
       }
     }
 
+    else if(command == 'ship'){
+      var shipInfo = new MessageEmbed()
+        .setColor('#bb0000')
+        .setTitle(":ringed_planet: Planet command:")
+        .setAuthor(`${user.username}'s Ship`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+        .setDescription('`planet details [name]`: get details about any scanned or stored planet\n`planet add [name]`: store a scanned planet in your database\n`planet remove [name]`: remove a planet from your database\n`planet list`: get a list of planets in your database')
+      message.channel.send({ embeds: [shipInfo] });
+    }
+
     else if(command == 'journey'){
       if(args[0] == 'info'){
         if(user.journeying){
@@ -404,6 +419,12 @@ client.on('messageCreate', async message => {
         }else{
           message.channel.send("You are not currently on a journey!");
         }
+      }else{
+        var journeyCommandInfo = new MessageEmbed()
+          .setColor('#bb0000')
+          .setTitle(":rocket: Journey command:")
+          .setDescription('`journey start [name]`: start a journey to a new location!\n`journey cancel`: cancel your current journey\n`journey info`: see details on your current journey and location')
+        message.channel.send({ embeds: [journeyCommandInfo] });
       }
     }
 
