@@ -65,9 +65,31 @@ const userSchema = new Schema({
     type: Array,
     default: []
   }, 
+  maxPlanetStorage: {
+    type: Number,
+    default: 3
+  }, 
   currentLocation: {
     type: String,
     default: "nowhere"
+  }, 
+  sourceLocation: String, 
+  targetLocation: String,
+  journeyStartTime: {
+    type: Number,
+    default: 0
+  },
+  journeying: {
+    type: Boolean,
+    default: false
+  },
+  journeySteps: {
+    type: Array,
+    default: []
+  },
+  engineSpeed: {
+    type: Number,
+    default: 10
   }
 }, {timestamps: true})
 

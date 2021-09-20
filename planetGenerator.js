@@ -1,7 +1,7 @@
 const mobDictionary = require("./mobDictionary");
 
 // list from https://www.wikiwand.com/en/Planets_in_science_fiction#/Planet_lists
-const planetNames = ["Aegis", "Aldabra", "Aldebaran", "Altair", "Alternia", "Amel", "Antar", "Arieka", "Athena", "Athos", "Aurelia", "Avalon", "Azeroth", "Ballybran", "Belzagor", "Botany", "Bronson", "Celeschul", "Chiron", "Chorus", "Chthon", "Chu", "Cocoon", "Corneria", "Coronis", "Cyteen", "Darkover", "Darwin", "Death", "Demeter", "Deucalion", "Downbelow", "Dragon's Egg", "Droo"];
+const planetNames = ["Aegis", "Aldabra", "Aldebaran", "Altair", "Alternia", "Amel", "Antar", "Arieka", "Athena", "Athos", "Aurelia", "Avalon", "Azeroth", "Ballybran", "Belzagor", "Botany", "Bronson", "Celeschul", "Chiron", "Chorus", "Chthon", "Chu", "Cocoon", "Corneria", "Coronis", "Cyteen", "Darkover", "Darwin", "Death", "Demeter", "Deucalion", "Downbelow", "Dragon", "Droo"];
 
 var discoveryChance = 0.9;
 var discoveryChanceDecay = 0.7;

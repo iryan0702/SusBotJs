@@ -246,25 +246,164 @@ client.on('messageCreate', async message => {
         if(args[1]){
           for(let i = 0; i < user.scannedPlanets.length; i++){
             if(args[1].toLowerCase() == user.scannedPlanets[i].name.toLowerCase()){
-              displayPlanetDetailEmbed(user.scannedPlanets[i], message.channel);
+              displayPlanetDetailEmbed(user.scannedPlanets[i], "scanned", message.channel);
               return;
             }
           }
           for(let i = 0; i < user.storedPlanets.length; i++){
             if(args[1].toLowerCase() == user.storedPlanets[i].name.toLowerCase()){
-              displayPlanetDetailEmbed(user.storedPlanets[i], message.channel);
+              displayPlanetDetailEmbed(user.storedPlanets[i], "stored", message.channel);
               return;
             }
           }
+          message.channel.send("No planet with the name found?");
         }else{
           message.channel.send("Command: `planets detail [planet name]`");
         }
+      }else if(args[0] == 'add'){
+        if(args[1]){
+          if(user.maxPlanetStorage <= user.storedPlanets.length){
+            message.channel.send("You have too many planets in your database!\nRemove some with `planets remove [name]`");
+          }else{
+            var planetToAdd;
+            for(let i = 0; i < user.scannedPlanets.length; i++){
+              if(args[1].toLowerCase() == user.scannedPlanets[i].name.toLowerCase()){
+                planetToAdd = user.scannedPlanets[i];
+                break;
+              }
+            }
+            if(planetToAdd){
+              let alreadyAdded = false;
+              for(let i = 0; i < user.storedPlanets.length; i++){
+                if(args[1].toLowerCase() == user.storedPlanets[i].name.toLowerCase()){
+                  alreadyAdded = true;
+                  break;
+                }
+              }
+              if(alreadyAdded){
+                message.channel.send("That planet is already added!");
+              }else{
+                user.storedPlanets.push(planetToAdd);
+                var addPlanetInfo = new MessageEmbed()
+                  .setColor('#bb0000')
+                  .setTitle(":ringed_planet: Added Planet:")
+                  .setDescription(`Added ${planetToAdd.name} to your planet database!`)
+                message.channel.send({ embeds: [addPlanetInfo] });
+              }
+            }else{
+              message.channel.send("That planet is not in your scanned list!");
+            }
+          }
+        }else{
+          message.channel.send("Command: `planets add [planet name]`");
+        }
+      }else if(args[0] == 'remove'){
+        if(args[1]){
+          let i;
+          for(i = 0; i < user.storedPlanets.length; i++){
+            if(args[1].toLowerCase() == user.storedPlanets[i].name.toLowerCase()){
+              break;
+            }
+          }
+          if(i < user.storedPlanets.length){
+            var removePlanetInfo = new MessageEmbed()
+              .setColor('#bb0000')
+              .setTitle(":ringed_planet: Removed Planet:")
+              .setDescription(`Removed ${user.storedPlanets[i].name} from your planet database!`)
+            message.channel.send({ embeds: [removePlanetInfo] });
+            user.storedPlanets.splice(i, 1);
+          }else{
+            message.channel.send("That planet is not in your database!");
+          }
+        }else{
+          message.channel.send("Command: `planets remove [planet name]`");
+        }
+      }else if(args[0] == 'list'){
+        displayPlanetsSummaryEmbed(user, "stored", message.channel);
       }else{
         var planetCommandInfo = new MessageEmbed()
           .setColor('#bb0000')
           .setTitle(":ringed_planet: Planet command:")
-          .setDescription('`planet details [name]`: get details about any scanned or stored planet\n~~planet add [name]~~: add a scanned planet to your stored planets list\n~~planet remove [name]~~: remove a planet from your stored planets list\n~~planet list~~: get a list of your stored planets')
+          .setDescription('`planet details [name]`: get details about any scanned or stored planet\n`planet add [name]`: store a scanned planet in your database\n`planet remove [name]`: remove a planet from your database\n`planet list`: get a list of planets in your database')
         message.channel.send({ embeds: [planetCommandInfo] });
+      }
+    }
+
+    else if(command == 'journey'){
+      if(args[0] == 'info'){
+        if(user.journeying){
+          let journeyProgress = updateJourneyLocation(user, message.createdTimestamp);
+          let totalDashes = 40;
+          let leftDashes = Math.floor(journeyProgress*totalDashes);
+          var travelInfo = new MessageEmbed()
+            .setColor('#bb0000')
+            .setTitle(":rocket: Journey:")
+            .setDescription(`\`${user.sourceLocation.toLowerCase()}\`${"-".repeat(leftDashes)}:rocket:${"-".repeat(totalDashes-leftDashes)}\`${user.targetLocation.toUpperCase()}\`\n\nYou are currently at: \`${user.currentLocation}\`\nYou are ${Math.floor(journeyProgress*10000)/100}% to your destination!`)
+          message.channel.send({ embeds: [travelInfo] });
+
+          if(journeyProgress >= 1){
+            user.journeying = false;
+            user.currentLocation = user.currentLocation.toLowerCase().trim();
+            message.channel.send("Journey complete!");
+          }
+        }else{
+          var travelInfo = new MessageEmbed()
+            .setColor('#bb0000')
+            .setTitle(":rocket: Journey:")
+            .setDescription(`--------------------:rocket:--------------------\n\nYou are currently at: \`${user.currentLocation.toLowerCase()}\``)
+          message.channel.send({ embeds: [travelInfo] });
+        }
+      }else if(args[0] == 'start'){
+        if(user.journeying){
+          message.channel.send("You are already on a journey!\nUse `journey cancel` to cancel your current journey.");
+        }else if(args[1]){
+          if(args[1].match("^[a-zA-Z ]+$")){
+            if(args[1].length < 2){
+              message.channel.send("The destination name is too short!");
+            }else if(args[1].length <= 12){
+              var distanceArray = getDistanceArray(user.currentLocation, args[1]);
+              var timeArray = [];
+              for(let i = 0; i < distanceArray.length; i++){
+                timeArray.push(distanceArray[i]/user.engineSpeed*60*60*1000);
+              }
+              user.journeySteps = timeArray;
+              var distance = distanceArray.reduce((a, b) => a + b, 0);
+              var journeyTime = Math.floor(distance/user.engineSpeed*60*60); //in seconds
+              var journeySecond = journeyTime%60;
+              var joruneyMinute = (journeyTime-journeySecond)%3600;
+              var journeyHour = journeyTime-joruneyMinute;
+              journeyHour /= 3600;
+              joruneyMinute /= 60;
+              var travelInfo = new MessageEmbed()
+                .setColor('#bb0000')
+                .setTitle(":rocket: Journey:")
+                .setDescription(`\`${user.currentLocation.toLowerCase()}\`:rocket:----------------------------------------\`${args[1].trim().toUpperCase()}\`\n\nThe distance between \`${user.currentLocation.toLowerCase()}\` and \`${args[1].toUpperCase()}\` is **${distance}SU** (Space Units)\nYour engine speed is **${user.engineSpeed}SU/hr**\nThis journey will take \`${journeyHour}h ${joruneyMinute}m ${journeySecond}s\`\n\nAre you sure you want to start this journey?\n\`"YES" to start.\``)
+              message.channel.send({ embeds: [travelInfo] });
+              user.sourceLocation = user.currentLocation.trim();
+              user.targetLocation = args[1].trim();
+              user.listenMode = "journeyConfirmation";
+            }else{
+              message.channel.send("The destination name is too long!");
+            }
+          }else{
+            message.channel.send("The destination name can only contain alphabets!");
+          }
+        }else{
+          message.channel.send("Command: `journey start [target location]`");
+        }
+      }else if(args[0] == 'cancel'){
+        if(user.journeying){
+          updateJourneyLocation(user, message.createdTimestamp);
+          user.journeying = false;
+          user.currentLocation = user.currentLocation.toLowerCase().trim();
+          var cancelInfo = new MessageEmbed()
+            .setColor('#bb0000')
+            .setTitle(":rocket: Journey:")
+            .setDescription(`Journey cancelled!`)
+          message.channel.send({ embeds: [cancelInfo] });
+        }else{
+          message.channel.send("You are not currently on a journey!");
+        }
       }
     }
 
@@ -681,9 +820,12 @@ client.on('messageCreate', async message => {
     /// ADMIN TEST COMMANDS
     if(message.author.id == '95070190370299904'){
       //something weird so it's harder to accidentally proc this
-      if(command == 'sussy sussy clear the leaderboard'){
+      if(command == 'sussysussycleartheleaderboard'){
           db.set("matchLeaderboard", {})
           message.channel.send("Cleared leaderboard!");
+      }
+      if(command == 'spacetimewarp'){
+        user.journeyStartTime -= 3600000;
       }
     }
   }
@@ -694,7 +836,21 @@ client.on('messageCreate', async message => {
 
 async function listenModeResponses(user, message){
   const content = message.content.toLowerCase().replace(/\s+/g, ' ').trim();
-  if(user.listenMode == "reply"){
+  if(user.listenMode == "journeyConfirmation"){
+    if(message.content == "YES"){
+      user.journeyStartTime = message.createdTimestamp;
+      user.journeying = true;
+      var journeyEmbed = new MessageEmbed()
+        .setColor('#bb0000')
+        .setTitle(':rocket: Journey Started!')
+        .setDescription('Good luck!')
+      message.channel.send({ embeds: [journeyEmbed] });
+    }else{
+      message.channel.send(`Response is not exactly \`YES\`. Journey cancelled.`);
+    }
+    user.listenMode = "none";
+    return true;
+  }else if(user.listenMode == "reply"){
     message.channel.send(`${message.author.username} said ${message.content}!`);
     user.listenMode = "none";
     return true;
@@ -820,9 +976,9 @@ function displayPlanetsSummaryEmbed(user, mode, channel){
     if(planetsList.length > 0){
       var planetsEmbed = new MessageEmbed()
       .setColor("#bb0000")
-      .setTitle(`Scanned Planets`)
+      .setTitle(`:satellite: Scanned Planets`)
       .setAuthor(`${user.username}'s Scanned Planets`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-      .setDescription("A list of planets from your previous scan.\nSee a planet's details with `planets detail [name]`!")
+      .setDescription("A list of planets from your previous scan.\nSee a planet's details with `planets detail [name]`")
       .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
 
       for(let i = 0; i < planetsList.length; i++){
@@ -864,9 +1020,66 @@ function displayPlanetsSummaryEmbed(user, mode, channel){
     }else{
       var planetsEmbed = new MessageEmbed()
       .setColor("#bb0000")
-      .setTitle(`Scanned Planets`)
+      .setTitle(`:satellite: Scanned Planets`)
       .setAuthor(`${user.username}'s Scanned Planets`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
       .setDescription("You haven't scanned any planets!\nUse `scanner scan` to start!")
+      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
+
+      channel.send({ embeds: [planetsEmbed] });
+    }
+  }else if(mode == "stored"){
+    var planetsList = user.storedPlanets;
+
+    if(planetsList.length > 0){
+      var planetsEmbed = new MessageEmbed()
+      .setColor("#bb0000")
+      .setTitle(`:floppy_disk: Stored Planets (${planetsList.length}/${user.maxPlanetStorage})`)
+      .setAuthor(`${user.username}'s Planet Database`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+      .setDescription("A list of planets in your database!")
+      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
+
+      for(let i = 0; i < planetsList.length; i++){
+        let planet = planetsList[i];
+        let dropsDescription = "";
+        let planetName = planet.name;
+
+        for(let j = 0; j < planet.flora.length; j++){
+          if(planet.floraDiscovery[j]){
+            dropsDescription += mobDictionary.getEmoji(planet.flora[j]).toString();
+          }else{
+            dropsDescription += "[?]";
+          }
+        }
+        for(let j = 0; j < planet.fauna.length; j++){
+          if(planet.faunaDiscovery[j]){
+            dropsDescription += mobDictionary.getEmoji(planet.fauna[j]).toString();
+          }else{
+            dropsDescription += "[?]";
+          }
+        }
+        if(planet.specials.length > 0){
+          dropsDescription += "\n";
+          for(let k = 0; k < planet.specials.length; k++){
+            if(k != 0){
+              dropsDescription += " ";
+            }
+            dropsDescription += " " + planetGenerator.getSpecialsDescription(planet.specials[k], true);
+          }
+        }
+        
+        specialsField = { name: `**${planetName}**`, value: `Known resources: ${dropsDescription}\n` };
+
+        planetsEmbed.addFields(specialsField);
+      }
+      planetsEmbed.setFooter('See details with "planets details [name]"!');
+
+      channel.send({ embeds: [planetsEmbed] });
+    }else{
+      var planetsEmbed = new MessageEmbed()
+      .setColor("#bb0000")
+      .setTitle(`:floppy_disk: Stored Planets (0/${user.maxPlanetStorage})`)
+      .setAuthor(`${user.username}'s Planet Database`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
+      .setDescription("You haven't stored any planets!\nUse `planets add [name]` to add a planet from your scan!")
       .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
 
       channel.send({ embeds: [planetsEmbed] });
@@ -874,7 +1087,35 @@ function displayPlanetsSummaryEmbed(user, mode, channel){
   }
 }
 
-function displayPlanetDetailEmbed(planet, channel){
+function updateJourneyLocation(user, currentTime){
+  var s = user.sourceLocation.toLowerCase();
+  var t = user.targetLocation.toUpperCase() + "                    "; //if target name is shorter, you might go to "ASH smth" at some point in time
+  var steps = user.journeySteps;
+  var timePassed = currentTime - user.journeyStartTime; //will be modified
+  var totalTimePassed = timePassed; //Will not be modified
+  var stepsPassed = 0;
+  var totalTimeRequired = 0;
+  for(let i = 0; i < steps.length; i++){
+    totalTimeRequired += steps[i];
+  }
+  for(let i = 0; i < steps.length; i++){
+    if(timePassed > steps[i]){
+      timePassed -= steps[i];
+      stepsPassed++;
+    }else{
+      break;
+    }
+  }
+
+  user.currentLocation = t.substring(0,stepsPassed) + s.substring(Math.min(stepsPassed,s.length),s.length);
+  return Math.min(1,totalTimePassed/totalTimeRequired);
+}
+
+function displayPlanetDetailEmbed(planet, mode, channel){
+  var authorText = "Scanned Planet";
+  if(mode == "stored"){
+    authorText = "Stored Planet";
+  }
   var floraEmoteString = "";
   for(let i = 0; i < planet.flora.length; i++){
     if(i != 0){
@@ -953,7 +1194,9 @@ function displayPlanetDetailEmbed(planet, channel){
     planetEmbed.addFields(specialsField);
   }
 
-  planetEmbed.setFooter('Store a planet into your database with "planets add" (not yet)');
+  if(mode == "scanned"){
+    planetEmbed.setFooter('Store a planet into your database with "planets add"');
+  }
 
   channel.send({ embeds: [planetEmbed] });
 }
@@ -990,6 +1233,34 @@ function shuffle(array) {
     }
   
     return array;
+}
+
+// get "distance" between 2 locations, based on name
+// each character difference is equal to 1 unit of distance
+function getDistanceArray(name1, name2){
+  var dif = [];
+  var i = 0;
+  var s1 = name1.toLowerCase();
+  var s2 = name2.toLowerCase();
+  while(i < name1.length || i < name2.length){
+    let v1 = 96;
+    let v2 = 96;
+    if(i < s1.length){
+      v1 = s1.charCodeAt(i);
+      if(v1 == 32){
+        v1 = 96;
+      }
+    }
+    if(i < s2.length){
+      v2 = s2.charCodeAt(i);
+      if(v2 == 32){
+        v2 = 96;
+      }
+    }
+    dif.push(Math.abs(v1-v2));
+    i++;
+  }
+  return dif;
 }
 
 // get user from MongoDB, if user does not already exist, create a new user
