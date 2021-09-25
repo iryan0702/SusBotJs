@@ -1,79 +1,8 @@
 const tier1Flora = ["Trigs", "Meatberries", "Lognuts", "Stonefruits", "Threadwood"];
-var trigsEmote, meatberriesEmote, lognutsEmote, stonefruitsEmote, threadwoodEmote;
 const tier1Fauna = ["Firrets", "Worves", "Kindlings", "String Snakes", "Rock Squids"];
-var firretsEmote, worvesEmote, kindlingsEmote, stringSnakesEmote, rockSquidsEmote;
-
 const resources = ["Stone", "Cloth", "Wood", "Food"];
-var stoneEmote, clothEmote, woodEmote, foodEmote;
 
-function load(client){
-  stoneEmote = client.emojis.cache.get("885488434112786452");
-  clothEmote = client.emojis.cache.get("885488433798193152");
-  woodEmote = client.emojis.cache.get("885488434133733386");
-  foodEmote = client.emojis.cache.get("885488434343456809");
-
-  trigsEmote = client.emojis.cache.get("885488433911447602");
-  meatberriesEmote = client.emojis.cache.get("885488434179895336");
-  lognutsEmote = client.emojis.cache.get("885488433416527913");
-  stonefruitsEmote = client.emojis.cache.get("885488434104377354");
-  threadwoodEmote = client.emojis.cache.get("885488434553159690");
-
-  firretsEmote = client.emojis.cache.get("885488433332633622");
-  worvesEmote = client.emojis.cache.get("885488433596874792");
-  kindlingsEmote = client.emojis.cache.get("885488434188263424");
-  stringSnakesEmote = client.emojis.cache.get("885488433986936832");
-  rockSquidsEmote = client.emojis.cache.get("885488434217644132");
-}
-
-function getEmoji(mobId){
-  switch(mobId){
-    case "Stone":
-      return stoneEmote;
-      break;
-    case "Cloth":
-      return clothEmote;
-      break;
-    case "Wood":
-      return woodEmote;
-      break;
-    case "Food":
-      return foodEmote;
-      break;
-
-    case "Trigs":
-      return trigsEmote;
-      break;
-    case "Meatberries":
-      return meatberriesEmote;
-      break;
-    case "Lognuts":
-      return lognutsEmote;
-      break;
-    case "Stonefruits":
-      return stonefruitsEmote;
-      break;
-    case "Threadwood":
-      return threadwoodEmote;
-      break;
-
-    case "Firrets":
-      return firretsEmote;
-      break;
-    case "Worves":
-      return worvesEmote;
-      break;
-    case "Kindlings":
-      return kindlingsEmote;
-      break;
-    case "String Snakes":
-      return stringSnakesEmote;
-      break;
-    case "Rock Squids":
-      return rockSquidsEmote;
-      break;
-  }
-  return rockSquidsEmote;
-}
+const emoteMaster = require("./emoteMaster");
 
 function getDrops(mobId){
   switch(mobId){
@@ -141,8 +70,6 @@ function shuffle(array) {
     return array;
 }
 
-exports.load = load;
-exports.getEmoji = getEmoji;
 exports.getDrops = getDrops;
 exports.getRandomTier1Floras = getRandomTier1Floras;
 exports.getRandomTier1Faunas = getRandomTier1Faunas;

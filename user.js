@@ -40,7 +40,10 @@ const userSchema = new Schema({
   /// give command memory
   giveTargetUserId: String,
   giveAmount: Number,
-  // Space game memory
+
+  //////
+  /// SPACE GAME MEMORY
+  //////
   credits: {
     type: Number,
     default: 0
@@ -73,6 +76,9 @@ const userSchema = new Schema({
     type: String,
     default: "nowhere"
   }, 
+  currentPlanet: {
+    type: String
+  }, 
   sourceLocation: String, 
   targetLocation: String,
   journeyStartTime: {
@@ -86,6 +92,9 @@ const userSchema = new Schema({
   journeySteps: {
     type: Array,
     default: []
+  },
+  journeyTimePerStep: {
+    type: Number
   },
   engineSpeed: {
     type: Number,

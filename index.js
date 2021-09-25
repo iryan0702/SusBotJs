@@ -2,8 +2,8 @@
 const keepAlive = require('./server')
 
 const { Client, Intents } = require('discord.js');
-const { MessageEmbed } = require('discord.js');
-const Database = require("@replit/database")
+
+const Database = require("@replit/database");
 const mongoose = require("mongoose");
 const UserM = require("./user");
 
@@ -13,8 +13,11 @@ intents.add(Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES);
 const client = new Client({ intents });
 const db = new Database();
 
+const { MessageEmbed } = require('discord.js');
+
+const emoteMaster = require("./emoteMaster");
 const mobDictionary = require("./mobDictionary");
-const planetGenerator = require("./planetGenerator");
+const planetMaster = require("./planetMaster");
 
 // mongoDB connection string
 const databaseLink = "mongodb+srv://iryan0702:tempInsecurePassword@susbotjs.6rrp1.mongodb.net/SusBotJs?retryWrites=true&w=majority";
@@ -108,7 +111,7 @@ db.get("fitLeaderboardHard").then(fitLeaderboardHard => {
 
 client.on('ready', () => {
     console.log(`${client.user.tag} has logged in!`);
-    mobDictionary.load(client);
+    emoteMaster.load(client);
 
     client.user.setActivity('check commands with Sus help!', { type: 'PLAYING' })
 });
@@ -221,44 +224,45 @@ client.on('messageCreate', async message => {
       message.channel.send(`Listening to <@${message.author.id}>`);
     }
     
-    else if(command == 'scanner'){
+    else if(command == 'scanner' || command == 'sc'){
       if(args[0] == 'scan'){
         var scanCooldown = 60 * 60;
         var lastScan = (message.createdTimestamp - user.lastScanTime)/1000;
         if(lastScan > scanCooldown || user.id == devId){
           user.lastScanTime = message.createdTimestamp;
           user.scannedPlanets = [];
-          user.scannedPlanets.push(planetGenerator.generatePlanet(user));
-          user.scannedPlanets.push(planetGenerator.generatePlanet(user));
+          user.scannedPlanets.push(planetMaster.generatePlanet(user));
+          user.scannedPlanets.push(planetMaster.generatePlanet(user));
 
-          displayPlanetsSummaryEmbed(user, "scanned", message.channel);
+          planetMaster.displayPlanetsSummaryEmbed(user, "scanned", message.channel);
           
         }else{
           message.channel.send(`Your scanner is cooling down! Please wait ${(Math.floor((scanCooldown - lastScan)/60))} Minutes and ${Math.ceil((scanCooldown - lastScan)%60)} Seconds!\nUpgrade your scanner system to decrease this cooldown (not a feature yet).`);
         }
       }else if(args[0] == 'list'){
-        displayPlanetsSummaryEmbed(user, "scanned", message.channel);
+        planetMaster.displayPlanetsSummaryEmbed(user, "scanned", message.channel);
       }else{
         var scannerCommandInfo = new MessageEmbed()
           .setColor('#bb0000')
           .setTitle(":satellite: Scannner command:")
           .setDescription('`scanner scan`: scan for new planets!\n`scanner list`: get a list of planets from your last scan')
+          .setFooter('Alias: "sc"');
         message.channel.send({ embeds: [scannerCommandInfo] });
       }
     }
 
-    else if(command == 'planets' || command == 'planet'){
+    else if(command == 'planets' || command == 'planet' || command == 'pl'){
       if(args[0] == 'detail' || args[0] == 'details'){
         if(args[1]){
           for(let i = 0; i < user.scannedPlanets.length; i++){
             if(args[1].toLowerCase() == user.scannedPlanets[i].name.toLowerCase()){
-              displayPlanetDetailEmbed(user.scannedPlanets[i], "scanned", message.channel);
+              planetMaster.displayPlanetDetailEmbed(user.scannedPlanets[i], "scanned", message.channel);
               return;
             }
           }
           for(let i = 0; i < user.storedPlanets.length; i++){
             if(args[1].toLowerCase() == user.storedPlanets[i].name.toLowerCase()){
-              displayPlanetDetailEmbed(user.storedPlanets[i], "stored", message.channel);
+              planetMaster.displayPlanetDetailEmbed(user.storedPlanets[i], "stored", message.channel);
               return;
             }
           }
@@ -325,12 +329,13 @@ client.on('messageCreate', async message => {
           message.channel.send("Command: `planets remove [planet name]`");
         }
       }else if(args[0] == 'list'){
-        displayPlanetsSummaryEmbed(user, "stored", message.channel);
+        planetMaster.displayPlanetsSummaryEmbed(user, "stored", message.channel);
       }else{
         var planetCommandInfo = new MessageEmbed()
           .setColor('#bb0000')
           .setTitle(":ringed_planet: Planet command:")
           .setDescription('`planet details [name]`: get details about any scanned or stored planet\n`planet add [name]`: store a scanned planet in your database\n`planet remove [name]`: remove a planet from your database\n`planet list`: get a list of planets in your database')
+          .setFooter('Alias: "pl"');
         message.channel.send({ embeds: [planetCommandInfo] });
       }
     }
@@ -338,22 +343,31 @@ client.on('messageCreate', async message => {
     else if(command == 'ship'){
       var shipInfo = new MessageEmbed()
         .setColor('#bb0000')
-        .setTitle(":ringed_planet: Planet command:")
+        .setTitle(":rocket: Your ship:")
         .setAuthor(`${user.username}'s Ship`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
         .setDescription('`planet details [name]`: get details about any scanned or stored planet\n`planet add [name]`: store a scanned planet in your database\n`planet remove [name]`: remove a planet from your database\n`planet list`: get a list of planets in your database')
       message.channel.send({ embeds: [shipInfo] });
     }
 
-    else if(command == 'journey'){
+    else if(command == 'journey' || command == 'jr'){
       if(args[0] == 'info'){
         if(user.journeying){
           let journeyProgress = updateJourneyLocation(user, message.createdTimestamp);
-          let totalDashes = 40;
-          let leftDashes = Math.floor(journeyProgress*totalDashes);
+          let journeyDisplayString = getJourneyDisplayString(user, journeyProgress);
+
+          var journeyTime = user.journeySteps.reduce((a, b) => a + b, 0)*user.journeyTimePerStep; //in mili
+          var journeyTimeLeft = Math.max(0,Math.ceil((journeyTime+user.journeyStartTime-message.createdTimestamp)/1000));
+          var journeySecond = journeyTimeLeft%60;
+          var journeyMinute = (journeyTimeLeft-journeySecond)%3600;
+          var journeyHour = journeyTimeLeft-journeyMinute-journeySecond;
+
+          journeyHour /= 3600;
+          journeyMinute /= 60;
+
           var travelInfo = new MessageEmbed()
-            .setColor('#bb0000')
-            .setTitle(":rocket: Journey:")
-            .setDescription(`\`${user.sourceLocation.toLowerCase()}\`${"-".repeat(leftDashes)}:rocket:${"-".repeat(totalDashes-leftDashes)}\`${user.targetLocation.toUpperCase()}\`\n\nYou are currently at: \`${user.currentLocation}\`\nYou are ${Math.floor(journeyProgress*10000)/100}% to your destination!`)
+            .setColor('#2e0045')
+            .setTitle(":milky_way: Journey:")
+            .setDescription(`Start: \`${user.sourceLocation.toLowerCase()}\`\n${journeyDisplayString}\nDestination: \`${user.targetLocation.toUpperCase()}\`\n\nCurrent location: \`${user.currentLocation}\`\nTime remaining: \`${journeyHour}h ${journeyMinute}m ${journeySecond}s\`\nYour journey is ${Math.floor(journeyProgress*10000)/100}% complete!`)
           message.channel.send({ embeds: [travelInfo] });
 
           if(journeyProgress >= 1){
@@ -363,8 +377,8 @@ client.on('messageCreate', async message => {
           }
         }else{
           var travelInfo = new MessageEmbed()
-            .setColor('#bb0000')
-            .setTitle(":rocket: Journey:")
+            .setColor('#2e0045')
+            .setTitle(":milky_way: Journey:")
             .setDescription(`--------------------:rocket:--------------------\n\nYou are currently at: \`${user.currentLocation.toLowerCase()}\``)
           message.channel.send({ embeds: [travelInfo] });
         }
@@ -377,25 +391,24 @@ client.on('messageCreate', async message => {
               message.channel.send("The destination name is too short!");
             }else if(args[1].length <= 12){
               var distanceArray = getDistanceArray(user.currentLocation, args[1]);
-              var timeArray = [];
-              for(let i = 0; i < distanceArray.length; i++){
-                timeArray.push(distanceArray[i]/user.engineSpeed*60*60*1000);
-              }
-              user.journeySteps = timeArray;
+              var journeyTimePerStep = Math.ceil(60*60*1000/user.engineSpeed);
+              user.journeyTimePerStep = journeyTimePerStep;
+              user.journeySteps = distanceArray;
               var distance = distanceArray.reduce((a, b) => a + b, 0);
-              var journeyTime = Math.floor(distance/user.engineSpeed*60*60); //in seconds
+              var journeyTime = Math.ceil(distance*journeyTimePerStep/1000); //in seconds
               var journeySecond = journeyTime%60;
-              var joruneyMinute = (journeyTime-journeySecond)%3600;
-              var journeyHour = journeyTime-joruneyMinute;
+              var journeyMinute = (journeyTime-journeySecond)%3600;
+              var journeyHour = journeyTime-journeyMinute-journeySecond;
               journeyHour /= 3600;
-              joruneyMinute /= 60;
-              var travelInfo = new MessageEmbed()
-                .setColor('#bb0000')
-                .setTitle(":rocket: Journey:")
-                .setDescription(`\`${user.currentLocation.toLowerCase()}\`:rocket:----------------------------------------\`${args[1].trim().toUpperCase()}\`\n\nThe distance between \`${user.currentLocation.toLowerCase()}\` and \`${args[1].toUpperCase()}\` is **${distance}SU** (Space Units)\nYour engine speed is **${user.engineSpeed}SU/hr**\nThis journey will take \`${journeyHour}h ${joruneyMinute}m ${journeySecond}s\`\n\nAre you sure you want to start this journey?\n\`"YES" to start.\``)
-              message.channel.send({ embeds: [travelInfo] });
+              journeyMinute /= 60;
+              let journeyDisplayString = getJourneyDisplayString(user, 0);
               user.sourceLocation = user.currentLocation.trim();
               user.targetLocation = args[1].trim();
+              var travelInfo = new MessageEmbed()
+                .setColor('#2e0045')
+                .setTitle(":milky_way: Journey:")
+                .setDescription(`Start: \`${user.sourceLocation.toLowerCase()}\`\n${journeyDisplayString}\nDestination: \`${user.targetLocation.toUpperCase()}\`\n\nThe distance between \`${user.currentLocation.toLowerCase()}\` and \`${args[1].toUpperCase()}\` is **${distance}SU** (Space Units)\nYour engine speed is **${user.engineSpeed}SU/hr**\nThis journey will take \`${journeyHour}h ${journeyMinute}m ${journeySecond}s\`\n\nAre you sure you want to start this journey?\n\`"YES" to start.\``)
+              message.channel.send({ embeds: [travelInfo] });
               user.listenMode = "journeyConfirmation";
             }else{
               message.channel.send("The destination name is too long!");
@@ -412,8 +425,8 @@ client.on('messageCreate', async message => {
           user.journeying = false;
           user.currentLocation = user.currentLocation.toLowerCase().trim();
           var cancelInfo = new MessageEmbed()
-            .setColor('#bb0000')
-            .setTitle(":rocket: Journey:")
+            .setColor('#2e0045')
+            .setTitle(":milky_way: Journey:")
             .setDescription(`Journey cancelled!`)
           message.channel.send({ embeds: [cancelInfo] });
         }else{
@@ -421,9 +434,10 @@ client.on('messageCreate', async message => {
         }
       }else{
         var journeyCommandInfo = new MessageEmbed()
-          .setColor('#bb0000')
-          .setTitle(":rocket: Journey command:")
+          .setColor('#2e0045')
+          .setTitle(":milky_way: Journey command:")
           .setDescription('`journey start [name]`: start a journey to a new location!\n`journey cancel`: cancel your current journey\n`journey info`: see details on your current journey and location')
+          .setFooter('Alias: "jr"');
         message.channel.send({ embeds: [journeyCommandInfo] });
       }
     }
@@ -848,6 +862,48 @@ client.on('messageCreate', async message => {
       if(command == 'spacetimewarp'){
         user.journeyStartTime -= 3600000;
       }
+      if(command == 'activitycheck'){
+        if(args[0]){
+          console.log("activityCheck???");
+          let messageArray = getMessages(message.channel, args[0],message.author.id);
+          // for(let i = 0; i < messageArray.length; i++){
+          //   console.log(messageArray[i].content);
+          // }
+        }
+      }
+      if(command == 'convertstamp'){
+        console.log("convertstamp???");
+        console.log(convertTimestamp(message.createdTimestamp));
+      }
+      
+      if(command == 'testboi'){
+        var testEmbed = new MessageEmbed()
+        .setColor('#222222')
+        .setTitle(':milky_way: Journey')
+        .setDescription('Start: `earth`\n:milky_way:`M` ▓▓▓\n:milky_way:`O` ▓▓\n:milky_way:`O` ▓▓▓\n:milky_way:`N` \n:milky_way:`B` ▓▓\n:rocket:`A` ▓░░\n:milky_way:`B` \n:milky_way:`O` ░░\n:milky_way:`O` ░░░\n:milky_way:`N` ░░\nDestination: `MOONBABOON`\n\nCurrent Location: `MOONB`\nTime Left: `1h 26m 49s`\nnYour journey is `55.3%` complete!')
+        message.channel.send({ embeds: [testEmbed] });
+      }
+      if(command == 'testboi2'){
+        var testEmbed = new MessageEmbed()
+        .setColor('#222222')
+        .setTitle(':milky_way: Journey')
+        .setDescription('Start: `earth`\n:milky_way:`M` ▓▓▓\n:milky_way:`O` ▓▓\n:milky_way:`O` ▓▓▓\n:milky_way:`N` \n:milky_way:`B` ▓▓\n:rocket:`_` ▓░░\n:milky_way:`_` \n:milky_way:`_` ░░\n:milky_way:`_` ░░░\n:milky_way:`_` ░░\nDestination: `MOONBABOON`\n\nCurrent Location: `MOONB`\nTime Left: `1h 26m 49s`\nnYour journey is `55.3%` complete!')
+        message.channel.send({ embeds: [testEmbed] });
+      }
+      if(command == 'testboi3'){
+        var testEmbed = new MessageEmbed()
+        .setColor('#222222')
+        .setTitle(':milky_way: Journey')
+        .setDescription('Start: `moonbaboon`\n:milky_way:`E-▓▓▓`\n:milky_way:`A-▓▓`\n:milky_way:`R-▓▓▓`\n:milky_way:`T-` \n:rocket:`b-▓░`\n:milky_way:`a-░░░`\n:milky_way:`b-` \n:milky_way:`o-░░`\n:milky_way:`o-░░░`\n:milky_way:`n-░░`\nDestination: `EARTH`\n\nCurrent Location: `EARTbaboon`\nTime Left: `1h 26m 49s`\nYour journey is `42.6%` complete!')
+        message.channel.send({ embeds: [testEmbed] });
+      }
+      if(command == 'testboi4'){
+        var testEmbed = new MessageEmbed()
+        .setColor('#222222')
+        .setTitle(':milky_way: Journey')
+        .setDescription('Start: `moonbaboon`\n:milky_way:`E` ▓▓▓\n:milky_way:`A` ▓▓\n:milky_way:`R` ▓▓▓\n:milky_way:`T` \n:rocket:`b` ▓░\n:milky_way:`a` ░░░\n:milky_way:`b` \n:milky_way:`o` ░░\n:milky_way:`o` ░░░\n:milky_way:`n` ░░\nDestination: `EARTH`\n\nCurrent Location: `EARTbaboon`\nTime Left: `1h 26m 49s`\nYour journey is `42.6%` complete!')
+        message.channel.send({ embeds: [testEmbed] });
+      }
     }
   }
 
@@ -862,8 +918,8 @@ async function listenModeResponses(user, message){
       user.journeyStartTime = message.createdTimestamp;
       user.journeying = true;
       var journeyEmbed = new MessageEmbed()
-        .setColor('#bb0000')
-        .setTitle(':rocket: Journey Started!')
+        .setColor('#2e0045')
+        .setTitle(':milky_way: Journey Started!')
         .setDescription('Good luck!')
       message.channel.send({ embeds: [journeyEmbed] });
     }else{
@@ -990,138 +1046,21 @@ async function listenModeResponses(user, message){
   return false;
 }
 
-function displayPlanetsSummaryEmbed(user, mode, channel){
-  if(mode == "scanned"){
-    var planetsList = user.scannedPlanets;
-
-    if(planetsList.length > 0){
-      var planetsEmbed = new MessageEmbed()
-      .setColor("#bb0000")
-      .setTitle(`:satellite: Scanned Planets`)
-      .setAuthor(`${user.username}'s Scanned Planets`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-      .setDescription("A list of planets from your previous scan.\nSee a planet's details with `planets detail [name]`")
-      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
-
-      for(let i = 0; i < planetsList.length; i++){
-        let planet = planetsList[i];
-        let dropsDescription = "";
-        let planetName = planet.name;
-
-        for(let j = 0; j < planet.flora.length; j++){
-          if(planet.floraDiscovery[j]){
-            dropsDescription += mobDictionary.getEmoji(planet.flora[j]).toString();
-          }else{
-            dropsDescription += "[?]";
-          }
-        }
-        for(let j = 0; j < planet.fauna.length; j++){
-          if(planet.faunaDiscovery[j]){
-            dropsDescription += mobDictionary.getEmoji(planet.fauna[j]).toString();
-          }else{
-            dropsDescription += "[?]";
-          }
-        }
-        if(planet.specials.length > 0){
-          dropsDescription += "\n";
-          for(let k = 0; k < planet.specials.length; k++){
-            if(k != 0){
-              dropsDescription += " ";
-            }
-            dropsDescription += " " + planetGenerator.getSpecialsDescription(planet.specials[k], true);
-          }
-        }
-        
-        specialsField = { name: `**${planetName}**`, value: `Known resources: ${dropsDescription}\n` };
-
-        planetsEmbed.addFields(specialsField);
-      }
-      planetsEmbed.setFooter('Scan for new planets with "scanner scan"');
-
-      channel.send({ embeds: [planetsEmbed] });
-    }else{
-      var planetsEmbed = new MessageEmbed()
-      .setColor("#bb0000")
-      .setTitle(`:satellite: Scanned Planets`)
-      .setAuthor(`${user.username}'s Scanned Planets`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-      .setDescription("You haven't scanned any planets!\nUse `scanner scan` to start!")
-      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
-
-      channel.send({ embeds: [planetsEmbed] });
-    }
-  }else if(mode == "stored"){
-    var planetsList = user.storedPlanets;
-
-    if(planetsList.length > 0){
-      var planetsEmbed = new MessageEmbed()
-      .setColor("#bb0000")
-      .setTitle(`:floppy_disk: Stored Planets (${planetsList.length}/${user.maxPlanetStorage})`)
-      .setAuthor(`${user.username}'s Planet Database`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-      .setDescription("A list of planets in your database!")
-      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
-
-      for(let i = 0; i < planetsList.length; i++){
-        let planet = planetsList[i];
-        let dropsDescription = "";
-        let planetName = planet.name;
-
-        for(let j = 0; j < planet.flora.length; j++){
-          if(planet.floraDiscovery[j]){
-            dropsDescription += mobDictionary.getEmoji(planet.flora[j]).toString();
-          }else{
-            dropsDescription += "[?]";
-          }
-        }
-        for(let j = 0; j < planet.fauna.length; j++){
-          if(planet.faunaDiscovery[j]){
-            dropsDescription += mobDictionary.getEmoji(planet.fauna[j]).toString();
-          }else{
-            dropsDescription += "[?]";
-          }
-        }
-        if(planet.specials.length > 0){
-          dropsDescription += "\n";
-          for(let k = 0; k < planet.specials.length; k++){
-            if(k != 0){
-              dropsDescription += " ";
-            }
-            dropsDescription += " " + planetGenerator.getSpecialsDescription(planet.specials[k], true);
-          }
-        }
-        
-        specialsField = { name: `**${planetName}**`, value: `Known resources: ${dropsDescription}\n` };
-
-        planetsEmbed.addFields(specialsField);
-      }
-      planetsEmbed.setFooter('See details with "planets details [name]"!');
-
-      channel.send({ embeds: [planetsEmbed] });
-    }else{
-      var planetsEmbed = new MessageEmbed()
-      .setColor("#bb0000")
-      .setTitle(`:floppy_disk: Stored Planets (0/${user.maxPlanetStorage})`)
-      .setAuthor(`${user.username}'s Planet Database`, 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-      .setDescription("You haven't stored any planets!\nUse `planets add [name]` to add a planet from your scan!")
-      .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg');
-
-      channel.send({ embeds: [planetsEmbed] });
-    }
-  }
-}
-
 function updateJourneyLocation(user, currentTime){
   var s = user.sourceLocation.toLowerCase();
   var t = user.targetLocation.toUpperCase() + "                    "; //if target name is shorter, you might go to "ASH smth" at some point in time
   var steps = user.journeySteps;
+  var tps = user.journeyTimePerStep;
   var timePassed = currentTime - user.journeyStartTime; //will be modified
   var totalTimePassed = timePassed; //Will not be modified
   var stepsPassed = 0;
   var totalTimeRequired = 0;
   for(let i = 0; i < steps.length; i++){
-    totalTimeRequired += steps[i];
+    totalTimeRequired += steps[i] * tps;
   }
   for(let i = 0; i < steps.length; i++){
-    if(timePassed > steps[i]){
-      timePassed -= steps[i];
+    if(timePassed > steps[i] * tps){
+      timePassed -= steps[i] * tps;
       stepsPassed++;
     }else{
       break;
@@ -1129,97 +1068,38 @@ function updateJourneyLocation(user, currentTime){
   }
 
   user.currentLocation = t.substring(0,stepsPassed) + s.substring(Math.min(stepsPassed,s.length),s.length);
+
   return Math.min(1,totalTimePassed/totalTimeRequired);
 }
 
-function displayPlanetDetailEmbed(planet, mode, channel){
-  var authorText = "Scanned Planet";
-  if(mode == "stored"){
-    authorText = "Stored Planet";
-  }
-  var floraEmoteString = "";
-  for(let i = 0; i < planet.flora.length; i++){
+// progress from 0-1
+function getJourneyDisplayString(user, progress){
+  var c = user.currentLocation;
+  var totalJourneySteps = user.journeySteps.reduce((a, b) => a + b, 0);;
+  var completedSteps = Math.floor(progress*totalJourneySteps);
+
+  var finalString = "";
+  var progressBar = "●".repeat(completedSteps) + "○".repeat(totalJourneySteps-completedSteps);
+  var stepsProcessed = 0;
+  
+  for(let i = 0; i < user.journeySteps.length; i++){
     if(i != 0){
-      floraEmoteString += "\n";
-    }
-    if(planet.floraDiscovery[i]){
-      let floraItem = mobDictionary.getEmoji(planet.flora[i]).toString();
-      floraEmoteString += `${floraItem} ${planet.flora[i]}`
-    }else{
-      floraEmoteString += `**[?]**`
-    }
-    if(planet.floraRateDiscovery[i]){
-      floraEmoteString += ` – Quantity: ${planet.floraRate[i]}\n\\> Drops: `;
-    }else{
-      floraEmoteString += ` – Quantity: **[?]**\n\\> Drops: `;
-    }
-    if(planet.floraDiscovery[i]){
-      let floraDrops = mobDictionary.getDrops(planet.flora[i]);
-      for(let j = 0; j < floraDrops.length; j++){
-        let floraDropItem = mobDictionary.getEmoji(floraDrops[j]).toString();
-        floraEmoteString += floraDropItem;
-      }
-    }else{
-      floraEmoteString += `**[?]**`
-    }
-  }
-  var faunaEmoteString = "";
-  for(let i = 0; i < planet.fauna.length; i++){
-    if(i != 0){
-      faunaEmoteString += "\n";
-    }
-    if(planet.faunaDiscovery[i]){
-      let faunaItem = mobDictionary.getEmoji(planet.fauna[i]).toString();
-      faunaEmoteString += `${faunaItem} ${planet.fauna[i]}`
-    }else{
-      faunaEmoteString += `**[?]**`
-    }
-    if(planet.faunaRateDiscovery[i]){
-      faunaEmoteString += ` – Quantity: ${planet.faunaRate[i]}\n\\> Drops: `;
-    }else{
-      faunaEmoteString += ` – Quantity: **[?]**\n\\> Drops: `;
-    }
-    if(planet.faunaDiscovery[i]){
-      let faunaDrops = mobDictionary.getDrops(planet.fauna[i]);
-      for(let j = 0; j < faunaDrops.length; j++){
-        let faunaDropItem = mobDictionary.getEmoji(faunaDrops[j]).toString();
-        faunaEmoteString += faunaDropItem;
-      }
-    }else{
-      faunaEmoteString += `**[?]**`
-    }
-  }
-  var planetEmbed = new MessageEmbed()
-  .setColor(planet.embedColor)
-  .setTitle(`${planet.name}`)
-  .setAuthor('Scanned Planet', 'https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-  .setDescription(`A ${planet.descriptor} Type-1 planet with basic resources.\n*Average Temperature:* **${planet.temperature}°C**\n*Atmospheric pressure:* **${planet.atmospheres} atm**`)
-  .setThumbnail('https://preview.free3d.com/img/2015/12/2179865938982077987/3g3fvmbw-900.jpg')
-  .addFields(
-    { name: `**Planet Flora:**`, value: `${floraEmoteString}` },
-    { name: `**Planet Fauna:**`, value: `${faunaEmoteString}` },
-    { name: `**Underground Resources:**`, value: `${mobDictionary.getEmoji("Stone").toString()}\n(Type-1 planets do not contain precious metals.)` }
-  );
-
-  if(planet.specials.length > 0){
-    var specialsField;
-    specialsDescription = "";
-    for(let i = 0; i < planet.specials.length; i++){
-      if(i != 0){
-        specialsDescription += "\n";
-      }
-      specialsDescription += planetGenerator.getSpecialsDescription(planet.specials[i]);
+      finalString += "\n";
     }
 
-    specialsField = { name: `**Special Attributes:**`, value: `${specialsDescription} ` };
-    planetEmbed.addFields(specialsField);
+    let stepLetter = c[i];
+    let emote = ":milky_way:";
+    if(!stepLetter || stepLetter == " "){
+      stepLetter = "_";
+    }
+    if((stepsProcessed + user.journeySteps[i] > completedSteps && stepsProcessed <= completedSteps)){
+      emote = ":rocket:";
+    }
+    finalString += `${emote}\`${stepLetter}: ${progressBar.substring(stepsProcessed,stepsProcessed+user.journeySteps[i])}\``;
+    stepsProcessed += user.journeySteps[i];
   }
 
-  if(mode == "scanned"){
-    planetEmbed.setFooter('Store a planet into your database with "planets add"');
-  }
-
-  channel.send({ embeds: [planetEmbed] });
+  return finalString;
 }
 
 // getUserFromMention from https://discordjs.guide/miscellaneous/parsing-mention-arguments.html#implementation
@@ -1308,6 +1188,78 @@ async function getUser(searchId){
   }
 
   return returnUser;
+}
+
+async function getMessages(channel, idToBreak, authorId) {
+  const sum_messages = [];
+  let last_id;
+  var maxPerFetch = 50;
+  var lastTimestamp = -999;
+
+  while (true) {
+    const options = { limit: maxPerFetch };
+    if (last_id) {
+      options.before = last_id;
+    }
+
+    const messages = await channel.messages.fetch(options);
+    last_id = messages.last().id;
+    var toBreak = false;
+
+    messages.forEach(message => {
+      if(message.author.id == authorId){
+        sum_messages.push(message);
+        if(message.id == idToBreak){
+          toBreak = true;
+        }
+
+        var thisTimestamp = message.createdTimestamp;
+        if(lastTimestamp == -999){
+          lastTimestamp = thisTimestamp;
+        }
+
+        if((lastTimestamp-thisTimestamp) > 1000*60*60*2){
+          var lastT = convertTimestamp(lastTimestamp);
+          var thisT = convertTimestamp(thisTimestamp);
+          console.log(`There is a substancial time gap between ${lastT} and ${thisT}`);
+        }
+
+        lastTimestamp = thisTimestamp;
+      }
+    })
+
+    if (toBreak || messages.size != maxPerFetch) {
+      break;
+    }
+  }
+  return sum_messages;
+}
+
+function convertTimestamp(timestampMili) {
+  var timestamp = (timestampMili/1000) - 7*60*60;
+  var d = new Date(timestamp * 1000), // Convert the passed timestamp to milliseconds
+      yyyy = d.getFullYear(),
+      mm = ('0' + (d.getMonth() + 1)).slice(-2),  // Months are zero based. Add leading 0.
+      dd = ('0' + d.getDate()).slice(-2),         // Add leading 0.
+      hh = d.getHours(),
+      h = hh,
+      min = ('0' + d.getMinutes()).slice(-2),     // Add leading 0.
+      ampm = 'AM',
+      time;
+
+  if (hh > 12) {
+      h = hh - 12;
+      ampm = 'PM';
+  } else if (hh === 12) {
+      h = 12;
+      ampm = 'PM';
+  } else if (hh == 0) {
+      h = 12;
+  }
+
+  // ie: 2014-03-24, 3:00 PM
+  time = yyyy + '-' + mm + '-' + dd + ', ' + h + ':' + min + ' ' + ampm;
+  return time;
 }
 
 client.login(token);
